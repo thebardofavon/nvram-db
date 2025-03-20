@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define FILEPATH "/home/anushka/Desktop/Code/NVRAM/nvram.img"
+#define FILEPATH "/home/anushka/Documents/GitHub/nvram-db/NVRAM/nvram.img"
 #define FILESIZE (2L * 1024 * 1024 * 1024) // 2GB
 
 // Structure for free space block
