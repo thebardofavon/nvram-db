@@ -3,6 +3,7 @@
 #include <string.h>
 #include "ram_bptree.h"
 #include "free_space.h"
+#include "wal.h"  // Added WAL header
 
 // Main function to test the database
 int main() {
@@ -22,8 +23,9 @@ int main() {
         printf("5. Delete Row\n");
         printf("6. Iterate Table\n");
         printf("7. Close Table\n");
-        printf("8. Memory Stats\n");
-        printf("9. Exit\n");
+        // printf("8. Memory Stats\n");
+        printf("8. Show WAL Data\n");  // New option for showing WAL data
+        printf("9. Exit\n");          // Changed from 9 to 10
         printf("Enter choice: ");
         scanf("%d", &choice);
         
@@ -144,21 +146,28 @@ int main() {
                 break;
             }
             
-            case 8: {
-                // Display memory statistics
-                size_t ram_total_free, ram_largest_block;
-                int ram_free_blocks;
-                ram_get_stats(&ram_total_free, &ram_largest_block, &ram_free_blocks);
+            // case 8: {
+            //     // Display memory statistics
+            //     size_t ram_total_free, ram_largest_block;
+            //     int ram_free_blocks;
+            //     ram_get_stats(&ram_total_free, &ram_largest_block, &ram_free_blocks);
                 
-                printf("\nRAM Memory Statistics:\n");
-                printf("  Total Free Space: %zu bytes\n", ram_total_free);
-                printf("  Largest Free Block: %zu bytes\n", ram_largest_block);
-                printf("  Number of Free Blocks: %d\n", ram_free_blocks);
-                printf("\n");
+            //     printf("\nRAM Memory Statistics:\n");
+            //     printf("  Total Free Space: %zu bytes\n", ram_total_free);
+            //     printf("  Largest Free Block: %zu bytes\n", ram_largest_block);
+            //     printf("  Number of Free Blocks: %d\n", ram_free_blocks);
+            //     printf("\n");
+            //     break;
+            // }
+            
+            case 8: {
+                // Display WAL data
+                printf("\n=== WAL Data ===\n");
+                wal_show_data();
                 break;
             }
                 
-            case 9: {
+            case 9: {  // Changed from 9 to 10
                 // Shutdown database system
                 db_shutdown();
                 printf("Database system shutdown. Exiting...\n");

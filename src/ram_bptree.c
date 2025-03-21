@@ -4,6 +4,7 @@
 #include "free_space.h"     // For NVRAM allocation
 #include "ram_free_space.h"  // For RAM allocation
 #include "ram_bptree.h"
+#include "wal.h"           // Include WAL header
 
 // Maximum number of tables
 #define MAX_TABLES 10
@@ -136,63 +137,7 @@ void db_init() {
     printf("Database system initialized\n");
 }
 
-// Create a new table
-int db_create_table(const char *name) {
-    if (!is_initialized) {
-        printf("Error: Database not initialized\n");
-        return -1;
-    }
-    
-    // Find a free slot in tables array
-    int slot = -1;
-    for (int i = 0; i < MAX_TABLES; i++) {
-        if (tables[i] == NULL) {
-            slot = i;
-            break;
-        }
-    }
-    
-    if (slot == -1) {
-        printf("Error: Maximum number of tables reached\n");
-        return -1;
-    }
-    
-    // Check if table with same name already exists
-    for (int i = 0; i < MAX_TABLES; i++) {
-        if (tables[i] && strcmp(tables[i]->name, name) == 0) {
-            printf("Error: Table '%s' already exists\n", name);
-            return -1;
-        }
-    }
-    
-    // Create table structure
-    Table *table = (Table*)ram_allocate_memory(sizeof(Table));
-    if (!table) {
-        printf("Error: Failed to allocate memory for table\n");
-        return -1;
-    }
-    
-    // Create B+ Tree index
-    BPTree *tree = create_tree();
-    if (!tree) {
-        printf("Error: Failed to create index for table\n");
-        ram_free_memory(table, sizeof(Table));
-        return -1;
-    }
-    
-    // Initialize table
-    strncpy(table->name, name, MAX_TABLE_NAME - 1);
-    table->name[MAX_TABLE_NAME - 1] = '\0';
-    table->table_id = next_table_id++;
-    table->index = tree;
-    table->is_open = true;
-    
-    // Add to tables array
-    tables[slot] = table;
-    
-    printf("Table '%s' created with ID %d\n", name, table->table_id);
-    return table->table_id;
-}
+
 
 // Open an existing table
 Table* db_open_table(const char *name) {
@@ -235,106 +180,6 @@ NVRAMPtr db_get_row(Table *table, int key, size_t *size) {
     return leaf->data_ptrs[pos];
 }
 
-// Insert key-value pair (simplified, doesn't handle node splitting)
-bool db_put_row(Table *table, int key, void *data, size_t size) {
-    if (!table || !table->is_open) {
-        printf("Error: Invalid or closed table\n");
-        return false;
-    }
-    
-    // Allocate space in NVRAM for data
-    NVRAMPtr nvram_data = allocate_memory(size);
-    if (!nvram_data) {
-        printf("Error: Failed to allocate NVRAM space for data\n");
-        return false;
-    }
-    
-    // Copy data to NVRAM
-    memcpy(nvram_data, data, size);
-    
-    // Find leaf node where key should be inserted
-    BPTreeNode *leaf = find_leaf(table->index, key);
-    if (!leaf) {
-        printf("Error: Failed to find leaf node\n");
-        free_memory(nvram_data, size);
-        return false;
-    }
-    
-    // Check if key already exists
-    int pos = find_key_in_leaf(leaf, key);
-    if (pos != -1) {
-        // Update existing row
-        // Free old data
-        free_memory(leaf->data_ptrs[pos], leaf->data_sizes[pos]);
-        
-        // Update with new data
-        leaf->data_ptrs[pos] = nvram_data;
-        leaf->data_sizes[pos] = size;
-        return true;
-    }
-    
-    // Check if leaf is full
-    if (leaf->num_keys >= BP_ORDER - 1) {
-        printf("Error: Leaf node is full (splitting not implemented)\n");
-        free_memory(nvram_data, size);
-        return false;
-    }
-    
-    // Find position to insert
-    int i = leaf->num_keys - 1;
-    while (i >= 0 && leaf->keys[i] > key) {
-        leaf->keys[i + 1] = leaf->keys[i];
-        leaf->data_ptrs[i + 1] = leaf->data_ptrs[i];
-        leaf->data_sizes[i + 1] = leaf->data_sizes[i];
-        i--;
-    }
-    
-    // Insert key and data
-    leaf->keys[i + 1] = key;
-    leaf->data_ptrs[i + 1] = nvram_data;
-    leaf->data_sizes[i + 1] = size;
-    leaf->num_keys++;
-    
-    // Update record count
-    table->index->record_count++;
-    
-    return true;
-}
-
-// Delete a row
-bool db_delete_row(Table *table, int key) {
-    if (!table || !table->is_open) {
-        printf("Error: Invalid or closed table\n");
-        return false;
-    }
-    
-    // Find leaf node containing key
-    BPTreeNode *leaf = find_leaf(table->index, key);
-    if (!leaf) return false;
-    
-    // Find key in leaf
-    int pos = find_key_in_leaf(leaf, key);
-    if (pos == -1) {
-        // Key not found
-        return false;
-    }
-    
-    // Free NVRAM data
-    free_memory(leaf->data_ptrs[pos], leaf->data_sizes[pos]);
-    
-    // Remove key and shift others
-    for (int i = pos; i < leaf->num_keys - 1; i++) {
-        leaf->keys[i] = leaf->keys[i + 1];
-        leaf->data_ptrs[i] = leaf->data_ptrs[i + 1];
-        leaf->data_sizes[i] = leaf->data_sizes[i + 1];
-    }
-    leaf->num_keys--;
-    
-    // Update record count
-    table->index->record_count--;
-    
-    return true;
-}
 
 // Get the next row for iteration
 int db_get_next_row(Table *table, int current_key) {
@@ -416,6 +261,7 @@ static void free_tree(BPTree *tree) {
 
 // Shutdown database system
 void db_shutdown() {
+
     if (!is_initialized) return;
     
     // Close and free all tables
@@ -440,4 +286,211 @@ void db_shutdown() {
     
     is_initialized = false;
     printf("Database system shut down\n");
+}
+
+// Create a new table
+int db_create_table(const char *name) {
+    if (!is_initialized) {
+        printf("Error: Database not initialized\n");
+        return -1;
+    }
+    
+    // Find a free slot in tables array
+    int slot = -1;
+    for (int i = 0; i < MAX_TABLES; i++) {
+        if (tables[i] == NULL) {
+            slot = i;
+            break;
+        }
+    }
+    
+    if (slot == -1) {
+        printf("Error: Maximum number of tables reached\n");
+        return -1;
+    }
+    
+    // Check if table with same name already exists
+    for (int i = 0; i < MAX_TABLES; i++) {
+        if (tables[i] && strcmp(tables[i]->name, name) == 0) {
+            printf("Error: Table '%s' already exists\n", name);
+            return -1;
+        }
+    }
+    
+    // Create table structure
+    Table *table = (Table*)ram_allocate_memory(sizeof(Table));
+    if (!table) {
+        printf("Error: Failed to allocate memory for table\n");
+        return -1;
+    }
+    
+    // Create B+ Tree index
+    BPTree *tree = create_tree();
+    if (!tree) {
+        printf("Error: Failed to create index for table\n");
+        ram_free_memory(table, sizeof(Table));
+        return -1;
+    }
+    
+    // Initialize table
+    strncpy(table->name, name, MAX_TABLE_NAME - 1);
+    table->name[MAX_TABLE_NAME - 1] = '\0';
+    table->table_id = next_table_id++;
+    table->index = tree;
+    table->is_open = true;
+    
+    // Create WAL table in NVRAM
+    void *wal_table_ptr = allocate_memory(sizeof(WALTable));
+    if (!wal_table_ptr) {
+        printf("Error: Failed to allocate NVRAM for WAL table\n");
+        free_tree(tree);
+        ram_free_memory(table, sizeof(Table));
+        return -1;
+    }
+    
+    // Initialize WAL table
+    if (!wal_create_table(table->table_id, wal_table_ptr)) {
+        printf("Error: Failed to create WAL table\n");
+        free_memory(wal_table_ptr, sizeof(WALTable));
+        free_tree(tree);
+        ram_free_memory(table, sizeof(Table));
+        return -1;
+    }
+    
+    // Add to tables array
+    tables[slot] = table;
+    
+    printf("Table '%s' created with ID %d\n", name, table->table_id);
+    return table->table_id;
+}
+
+// Insert key-value pair (simplified, doesn't handle node splitting)
+bool db_put_row(Table *table, int key, void *data, size_t size) {
+    if (!table || !table->is_open) {
+        printf("Error: Invalid or closed table\n");
+        return false;
+    }
+    
+    // Allocate space in NVRAM for data
+    NVRAMPtr nvram_data = allocate_memory(size);
+    if (!nvram_data) {
+        printf("Error: Failed to allocate NVRAM space for data\n");
+        return false;
+    }
+    
+    // Copy data to NVRAM
+    memcpy(nvram_data, data, size);
+    
+    // Add WAL entry for the insertion
+    void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
+    if (!wal_entry_ptr) {
+        printf("Error: Failed to allocate NVRAM for WAL entry\n");
+        free_memory(nvram_data, size);
+        return false;
+    }
+    
+    // Add entry to WAL (1 for insertion)
+    if (!wal_add_entry(table->table_id, key, nvram_data, 1, wal_entry_ptr)) {
+        printf("Error: Failed to add WAL entry\n");
+        free_memory(wal_entry_ptr, sizeof(WALEntry));
+        free_memory(nvram_data, size);
+        return false;
+    }
+    
+    // Find leaf node where key should be inserted
+    BPTreeNode *leaf = find_leaf(table->index, key);
+    if (!leaf) {
+        printf("Error: Failed to find leaf node\n");
+        free_memory(nvram_data, size);
+        return false;
+    }
+    
+    // Check if key already exists
+    int pos = find_key_in_leaf(leaf, key);
+    if (pos != -1) {
+        // Update existing row
+        // Free old data
+        free_memory(leaf->data_ptrs[pos], leaf->data_sizes[pos]);
+        
+        // Update with new data
+        leaf->data_ptrs[pos] = nvram_data;
+        leaf->data_sizes[pos] = size;
+        return true;
+    }
+    
+    // Check if leaf is full
+    if (leaf->num_keys >= BP_ORDER - 1) {
+        printf("Error: Leaf node is full (splitting not implemented)\n");
+        free_memory(nvram_data, size);
+        return false;
+    }
+    
+    // Find position to insert
+    int i = leaf->num_keys - 1;
+    while (i >= 0 && leaf->keys[i] > key) {
+        leaf->keys[i + 1] = leaf->keys[i];
+        leaf->data_ptrs[i + 1] = leaf->data_ptrs[i];
+        leaf->data_sizes[i + 1] = leaf->data_sizes[i];
+        i--;
+    }
+    
+    // Insert key and data
+    leaf->keys[i + 1] = key;
+    leaf->data_ptrs[i + 1] = nvram_data;
+    leaf->data_sizes[i + 1] = size;
+    leaf->num_keys++;
+    
+    // Update record count
+    table->index->record_count++;
+    
+    return true;
+}
+
+// Delete a row
+bool db_delete_row(Table *table, int key) {
+    if (!table || !table->is_open) {
+        printf("Error: Invalid or closed table\n");
+        return false;
+    }
+    
+    // Find leaf node containing key
+    BPTreeNode *leaf = find_leaf(table->index, key);
+    if (!leaf) return false;
+    
+    // Find key in leaf
+    int pos = find_key_in_leaf(leaf, key);
+    if (pos == -1) {
+        // Key not found
+        return false;
+    }
+    
+    // Add WAL entry for deletion before actually deleting data
+    void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
+    if (!wal_entry_ptr) {
+        printf("Error: Failed to allocate NVRAM for WAL entry\n");
+        return false;
+    }
+    
+    // Add entry to WAL (0 for deletion)
+    if (!wal_add_entry(table->table_id, key, NULL, 0, wal_entry_ptr)) {
+        printf("Error: Failed to add WAL entry\n");
+        free_memory(wal_entry_ptr, sizeof(WALEntry));
+        return false;
+    }
+    
+    // Free NVRAM data
+    free_memory(leaf->data_ptrs[pos], leaf->data_sizes[pos]);
+    
+    // Remove key and shift others
+    for (int i = pos; i < leaf->num_keys - 1; i++) {
+        leaf->keys[i] = leaf->keys[i + 1];
+        leaf->data_ptrs[i] = leaf->data_ptrs[i + 1];
+        leaf->data_sizes[i] = leaf->data_sizes[i + 1];
+    }
+    leaf->num_keys--;
+    
+    // Update record count
+    table->index->record_count--;
+    
+    return true;
 }
