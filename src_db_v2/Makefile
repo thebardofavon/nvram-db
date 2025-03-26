@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -g -I./src
 TARGET = nvram_db
 
 # Source files
-SRC = src/db_main.c src/free_space.c src/ram_free_space.c src/ram_bptree.c src/wal.c
+SRC = src/db_main.c src/free_space.c src/ram_free_space.c src/ram_bptree.c src/wal.c src/lock_manager.c
 
 # Object files
 OBJ = $(SRC:.c=.o)
