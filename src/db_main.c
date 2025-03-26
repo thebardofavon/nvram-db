@@ -3,7 +3,7 @@
 #include <string.h>
 #include "ram_bptree.h"
 #include "free_space.h"
-#include "wal.h"  // Added WAL header
+#include "wal.h"  
 
 // Main function to test the database
 int main() {
@@ -24,8 +24,8 @@ int main() {
         printf("6. Iterate Table\n");
         printf("7. Close Table\n");
         // printf("8. Memory Stats\n");
-        printf("8. Show WAL Data\n");  // New option for showing WAL data
-        printf("9. Exit\n");          // Changed from 9 to 10
+        printf("8. Show WAL Data\n");  
+        printf("9. Exit\n");
         printf("Enter choice: ");
         scanf("%d", &choice);
         
@@ -167,7 +167,7 @@ int main() {
                 break;
             }
                 
-            case 9: {  // Changed from 9 to 10
+            case 9: { 
                 // Shutdown database system
                 db_shutdown();
                 printf("Database system shutdown. Exiting...\n");

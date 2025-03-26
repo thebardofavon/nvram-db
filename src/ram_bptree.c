@@ -137,8 +137,6 @@ void db_init() {
     printf("Database system initialized\n");
 }
 
-
-
 // Open an existing table
 Table* db_open_table(const char *name) {
     if (!is_initialized) {
@@ -179,7 +177,6 @@ NVRAMPtr db_get_row(Table *table, int key, size_t *size) {
     if (size) *size = leaf->data_sizes[pos];
     return leaf->data_ptrs[pos];
 }
-
 
 // Get the next row for iteration
 int db_get_next_row(Table *table, int current_key) {
