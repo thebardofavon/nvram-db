@@ -28,7 +28,7 @@ int main()
 
     // printf("Data written: %s\n", (char *)map);
 
-    printf("NVRAM Data: %.*s\n", 13, map);
+    printf("NVRAM Data: %.*s\n", 1000, map);
 
     munmap(map, FILESIZE);
     close(fd);
