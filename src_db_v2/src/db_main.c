@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "ram_bptree.h"
-#include "free_space.h"
-#include "wal.h"  
+#include "../include/ram_bptree.h"
+#include "../include/free_space.h"
+#include "../include/wal.h"  
 
 // Main function to test the database
 int main() {

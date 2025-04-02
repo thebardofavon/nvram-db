@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "wal.h"
+#include "../include/wal.h"
 
 WALTable *wal_tables[MAX_TABLES] = {NULL};
 

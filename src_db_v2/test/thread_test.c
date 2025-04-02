@@ -4,10 +4,10 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <time.h>
-#include "ram_bptree.h"
-#include "free_space.h"
-#include "wal.h"
-#include "lock_manager.h"
+#include "../include/ram_bptree.h"
+#include "../include/free_space.h"
+#include "../include/wal.h"
+#include "../include/lock_manager.h"
 
 #define NUM_THREADS 4
 #define NUM_OPERATIONS 5

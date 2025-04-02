@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "free_space.h"     // For NVRAM allocation
-#include "ram_bptree.h"
-#include "wal.h"           // Include WAL header
-#include "lock_manager.h"  // Include lock manager header
+#include "../include/free_space.h"
+#include "../include/ram_bptree.h"
+#include "../include/wal.h"
+#include "../include/lock_manager.h"
 
 // Maximum number of tables
 #define MAX_TABLES 10

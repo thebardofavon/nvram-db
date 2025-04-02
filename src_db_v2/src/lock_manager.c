@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "lock_manager.h"
+#include "../include/lock_manager.h"
 
 // Initialize lock manager
 void lock_manager_init(LockManager *lm) {
