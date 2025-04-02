@@ -47,7 +47,7 @@ static Transaction* find_transaction(LockManager *lm, int txn_id) {
     }
     return NULL;
 }
-
+    
 // Find a lock entry
 static LockEntry* find_lock_entry(LockManager *lm, int resource_id, bool is_table) {
     LockEntry *entry = lm->lock_table;

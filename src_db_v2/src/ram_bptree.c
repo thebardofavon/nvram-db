@@ -550,11 +550,27 @@ int db_begin_transaction() {
     return transaction_begin(&g_lock_manager);
 }
 
-// Commit a transaction
+// // Commit a transaction
+// bool db_commit_transaction(int txn_id) {
+//     return transaction_commit(&g_lock_manager, txn_id);
+// }
+// Modified commit transaction to update WAL commit pointers
 bool db_commit_transaction(int txn_id) {
-    return transaction_commit(&g_lock_manager, txn_id);
+    bool result = transaction_commit(&g_lock_manager, txn_id);
+    
+    if (result) {
+        // Update WAL commit pointers for all tables
+        // In a real implementation, you would track which tables were modified
+        // by the transaction and only update those
+        for (int i = 0; i < MAX_TABLES; i++) {
+            if (tables[i] != NULL) {
+                wal_advance_commit_ptr(tables[i]->table_id, txn_id);
+            }
+        }
+    }
+    
+    return result;
 }
-
 // Abort a transaction
 bool db_abort_transaction(int txn_id) {
     return transaction_abort(&g_lock_manager, txn_id);
@@ -706,6 +722,179 @@ NVRAMPtr db_get_row(Table *table, int txn_id, int key, size_t *size) {
     return leaf->data_ptrs[pos];
 }
 
+// // Insert or update a row
+// bool db_put_row(Table *table, int txn_id, int key, void *data, size_t size) {
+//     if (!table || !table->is_open) {
+//         printf("Error: Invalid or closed table\n");
+//         return false;
+//     }
+    
+//     // Acquire locks
+//     if (!lock_acquire(&g_lock_manager, txn_id, table->table_id, true, LOCK_SHARED)) {
+//         printf("Error: Could not acquire table lock\n");
+//         return false;
+//     }
+    
+//     if (!lock_acquire(&g_lock_manager, txn_id, key, false, LOCK_EXCLUSIVE)) {
+//         printf("Error: Could not acquire row lock\n");
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Allocate space in NVRAM for data
+//     NVRAMPtr nvram_data = allocate_memory(size);
+//     if (!nvram_data) {
+//         printf("Error: Failed to allocate NVRAM space for data\n");
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Copy data to NVRAM
+//     memcpy(nvram_data, data, size);
+    
+//     // Add WAL entry for the insertion
+//     void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
+//     if (!wal_entry_ptr) {
+//         printf("Error: Failed to allocate NVRAM for WAL entry\n");
+//         free_memory(nvram_data, size);
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Add entry to WAL (1 for insertion)
+//     if (!wal_add_entry(table->table_id, key, nvram_data, 1, wal_entry_ptr)) {
+//         printf("Error: Failed to add WAL entry\n");
+//         free_memory(wal_entry_ptr, sizeof(WALEntry));
+//         free_memory(nvram_data, size);
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Handle empty tree case
+//     if (table->index->root == NULL) {
+//         table->index->root = create_node(true);
+//         if (!table->index->root) {
+//             printf("Error: Failed to create root node\n");
+//             free_memory(nvram_data, size);
+//             lock_release(&g_lock_manager, txn_id, key, false);
+//             lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//             return false;
+//         }
+        
+//         table->index->root->keys[0] = key;
+//         table->index->root->data_ptrs[0] = nvram_data;
+//         table->index->root->data_sizes[0] = size;
+//         table->index->root->num_keys = 1;
+//         table->index->record_count++;
+        
+//         // No need to release locks yet since the transaction is still ongoing
+//         // They will be released when the transaction commits or aborts
+//         return true;
+//     }
+    
+//     // Recursive insertion
+//     int up_key;
+//     BPTreeNode *new_node = NULL;
+    
+//     if (!insert_recursive(table->index, table->index->root, key, nvram_data, size, &up_key, &new_node)) {
+//         printf("Error: Failed to insert key\n");
+//         free_memory(nvram_data, size);
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Root split case
+//     if (new_node != NULL) {
+//         // Create new root
+//         BPTreeNode *new_root = create_node(false);
+//         if (!new_root) {
+//             printf("Error: Failed to create new root\n");
+//             free_node(new_node);
+//             lock_release(&g_lock_manager, txn_id, key, false);
+//             lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//             return false;
+//         }
+        
+//         // Set up new root
+//         new_root->keys[0] = up_key;
+//         new_root->children[0] = table->index->root;
+//         new_root->children[1] = new_node;
+//         new_root->num_keys = 1;
+        
+//         // Update tree
+//         table->index->root = new_root;
+//         table->index->height++;
+//         table->index->node_count++;
+//     }
+    
+//     // Update record count
+//     table->index->record_count++;
+    
+//     // No need to release locks yet since the transaction is still ongoing
+//     // They will be released when the transaction commits or aborts
+//     return true;
+// }
+
+// // Delete a row
+// bool db_delete_row(Table *table, int txn_id, int key) {
+//     if (!table || !table->is_open) {
+//         printf("Error: Invalid or closed table\n");
+//         return false;
+//     }
+    
+//     // Acquire locks
+//     if (!lock_acquire(&g_lock_manager, txn_id, table->table_id, true, LOCK_SHARED)) {
+//         printf("Error: Could not acquire table lock\n");
+//         return false;
+//     }
+    
+//     if (!lock_acquire(&g_lock_manager, txn_id, key, false, LOCK_EXCLUSIVE)) {
+//         printf("Error: Could not acquire row lock\n");
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Add WAL entry for deletion before actually deleting data
+//     void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
+//     if (!wal_entry_ptr) {
+//         printf("Error: Failed to allocate NVRAM for WAL entry\n");
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Add entry to WAL (0 for deletion)
+//     if (!wal_add_entry(table->table_id, key, NULL, 0, wal_entry_ptr)) {
+//         printf("Error: Failed to add WAL entry\n");
+//         free_memory(wal_entry_ptr, sizeof(WALEntry));
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Handle empty tree case
+//     if (table->index->root == NULL) {
+//         lock_release(&g_lock_manager, txn_id, key, false);
+//         lock_release(&g_lock_manager, txn_id, table->table_id, true);
+//         return false;
+//     }
+    
+//     // Recursive deletion
+//     bool result = remove_recursive(table->index, table->index->root, key, NULL, 0);
+    
+//     if (result) {
+//         // Update record count
+//         table->index->record_count--;
+//     }
+    
+//     // No need to release locks yet since the transaction is still ongoing
+//     // They will be released when the transaction commits or aborts
+//     return result;
+// }
 // Insert or update a row
 bool db_put_row(Table *table, int txn_id, int key, void *data, size_t size) {
     if (!table || !table->is_open) {
@@ -725,10 +914,21 @@ bool db_put_row(Table *table, int txn_id, int key, void *data, size_t size) {
         return false;
     }
     
+    // CHANGED: Create WAL entry BEFORE allocating NVRAM memory
+    // Add WAL entry for the insertion
+    void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
+    if (!wal_entry_ptr) {
+        printf("Error: Failed to allocate NVRAM for WAL entry\n");
+        lock_release(&g_lock_manager, txn_id, key, false);
+        lock_release(&g_lock_manager, txn_id, table->table_id, true);
+        return false;
+    }
+    
     // Allocate space in NVRAM for data
     NVRAMPtr nvram_data = allocate_memory(size);
     if (!nvram_data) {
         printf("Error: Failed to allocate NVRAM space for data\n");
+        free_memory(wal_entry_ptr, sizeof(WALEntry));
         lock_release(&g_lock_manager, txn_id, key, false);
         lock_release(&g_lock_manager, txn_id, table->table_id, true);
         return false;
@@ -737,18 +937,8 @@ bool db_put_row(Table *table, int txn_id, int key, void *data, size_t size) {
     // Copy data to NVRAM
     memcpy(nvram_data, data, size);
     
-    // Add WAL entry for the insertion
-    void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
-    if (!wal_entry_ptr) {
-        printf("Error: Failed to allocate NVRAM for WAL entry\n");
-        free_memory(nvram_data, size);
-        lock_release(&g_lock_manager, txn_id, key, false);
-        lock_release(&g_lock_manager, txn_id, table->table_id, true);
-        return false;
-    }
-    
     // Add entry to WAL (1 for insertion)
-    if (!wal_add_entry(table->table_id, key, nvram_data, 1, wal_entry_ptr)) {
+    if (!wal_add_entry(table->table_id, key, nvram_data, 1, wal_entry_ptr, size)) {
         printf("Error: Failed to add WAL entry\n");
         free_memory(wal_entry_ptr, sizeof(WALEntry));
         free_memory(nvram_data, size);
@@ -842,7 +1032,29 @@ bool db_delete_row(Table *table, int txn_id, int key) {
         return false;
     }
     
-    // Add WAL entry for deletion before actually deleting data
+    // Find the data and its size before deleting
+    size_t data_size = 0;
+    void *data_ptr = NULL;
+    
+    // Find leaf node containing key
+    BPTreeNode *leaf = find_leaf(table->index, key);
+    if (leaf) {
+        // Find key in leaf
+        int pos = find_key_in_leaf(leaf, key);
+        if (pos != -1) {
+            data_ptr = leaf->data_ptrs[pos];
+            data_size = leaf->data_sizes[pos];
+        }
+    }
+    
+    if (!data_ptr) {
+        printf("Error: Row to delete not found\n");
+        lock_release(&g_lock_manager, txn_id, key, false);
+        lock_release(&g_lock_manager, txn_id, table->table_id, true);
+        return false;
+    }
+    
+    // CHANGED: Add WAL entry for deletion before actually deleting data
     void *wal_entry_ptr = allocate_memory(sizeof(WALEntry));
     if (!wal_entry_ptr) {
         printf("Error: Failed to allocate NVRAM for WAL entry\n");
@@ -852,7 +1064,7 @@ bool db_delete_row(Table *table, int txn_id, int key) {
     }
     
     // Add entry to WAL (0 for deletion)
-    if (!wal_add_entry(table->table_id, key, NULL, 0, wal_entry_ptr)) {
+    if (!wal_add_entry(table->table_id, key, data_ptr, 0, wal_entry_ptr, data_size)) {
         printf("Error: Failed to add WAL entry\n");
         free_memory(wal_entry_ptr, sizeof(WALEntry));
         lock_release(&g_lock_manager, txn_id, key, false);
@@ -879,7 +1091,6 @@ bool db_delete_row(Table *table, int txn_id, int key) {
     // They will be released when the transaction commits or aborts
     return result;
 }
-
 // Get the next row for iteration
 int db_get_next_row(Table *table, int current_key) {
     if (!table || !table->is_open) {
