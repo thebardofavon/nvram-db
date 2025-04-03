@@ -1,0 +1,33 @@
+CC = gcc
+CFLAGS = -Wall -Wextra -g -I./include -pthread
+TARGET = university_test
+
+# Source files from the main database
+DB_SRC = src/db_main.c src/free_space.c src/ram_bptree.c src/wal.c src/lock_manager.c
+
+# Object files
+DB_OBJ = $(DB_SRC:.c=.o)
+
+# Our test program
+TEST_SRC = university_test.c
+
+# Default target
+all: $(TARGET)
+
+# Link object files to create executable
+$(TARGET): $(DB_OBJ) $(TEST_SRC)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# Compile source files to object files
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Clean up
+clean:
+	rm -f $(DB_OBJ) $(TARGET)
+
+# Run the test
+run: $(TARGET)
+	./$(TARGET)
+
+.PHONY: all clean run
