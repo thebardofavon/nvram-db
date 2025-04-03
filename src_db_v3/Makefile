@@ -1,21 +1,18 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g -I./include -pthread
-TARGET = university_test
+TARGET = nvram_db
 
-# Source files from the main database
-DB_SRC = src/db_main.c src/free_space.c src/ram_bptree.c src/wal.c src/lock_manager.c
+# Source files
+SRC = src/db_main.c src/free_space.c src/ram_bptree.c src/wal.c src/lock_manager.c db_university_test.c
 
 # Object files
-DB_OBJ = $(DB_SRC:.c=.o)
-
-# Our test program
-TEST_SRC = university_test.c
+OBJ = $(SRC:.c=.o)
 
 # Default target
 all: $(TARGET)
 
 # Link object files to create executable
-$(TARGET): $(DB_OBJ) $(TEST_SRC)
+$(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
 # Compile source files to object files
@@ -24,9 +21,9 @@ $(TARGET): $(DB_OBJ) $(TEST_SRC)
 
 # Clean up
 clean:
-	rm -f $(DB_OBJ) $(TARGET)
+	rm -f $(OBJ) $(TARGET) 
 
-# Run the test
+# Run the database
 run: $(TARGET)
 	./$(TARGET)
 

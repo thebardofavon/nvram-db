@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "lock_manager.h": "c"
+        "lock_manager.h": "c",
+        "db_university": "cpp"
     }
 }
