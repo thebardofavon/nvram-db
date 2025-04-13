@@ -3,11 +3,8 @@
 
 #include <stddef.h>
 
-#define FILEPATH "/dev/dax0.0"
-
+#define FILEPATH "/home/anushka/Documents/GitHub/nvram-db/NVRAM/nvram.img"
 #define FILESIZE (2L * 1024 * 1024 * 1024) // 2GB
-
-extern pthread_mutex_t free_space_mutex;
 
 // Initialize free space management system
 void init_free_space();
