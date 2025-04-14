@@ -3,7 +3,7 @@
 #include <string.h>
 #include "../include/wal.h"
 
-// move nti
+// movnti
 
 #include <immintrin.h>
 
