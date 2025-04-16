@@ -1,83 +1,120 @@
-# NVRAM Database with B+ Tree Indexing and WAL
+# NVRAM-Optimized Relational Database
 
-A lightweight database system that stores data in Non-Volatile RAM (NVRAM) with in-memory B+ tree indexing and Write-Ahead Logging (WAL) for durability.
+A high-performance relational database system leveraging the unique properties of Non-Volatile Random Access Memory (NVRAM) to achieve significant performance improvements over traditional in-memory databases.
 
-## Features
+## Overview
 
-- **NVRAM Storage**: Persistent data storage in memory-mapped NVRAM
-- **B+ Tree Indexing**: Fast key-value lookups using in-memory B+ tree
-- **Write-Ahead Logging (WAL)**: Transaction safety with persistent operation logging
-- **Memory Management**: Separate memory managers for RAM and NVRAM
-- **Multiple Tables**: Support for multiple concurrent database tables
-- **Simple CLI**: Interactive command-line interface for database operations
+This project implements a hybrid database architecture that stores indexes in volatile RAM and data in persistent NVRAM, combining the performance of in-memory databases with the durability of persistent storage. Through careful optimization of data structures and algorithms for byte-addressability and persistence, the system demonstrates substantial performance gains in standard benchmarks.
 
-## Implementation Details
+## Key Features
 
-### Memory Architecture
+- **Hybrid Memory Architecture**: Maintains indexes in volatile RAM for speed while storing data persistently in NVRAM
+- **Custom Free Space Manager**: Optimized for byte-addressable memory with efficient block merging and first-fit allocation
+- **B+ Tree Indexing**: Modified for direct NVRAM pointers to eliminate serialization overhead
+- **Innovative Write-Ahead Logging**: Stores pointers rather than data blocks, uniquely possible with byte-addressability
+- **Multi-granular Lock Manager**: Supports both table and row-level locking with low contention
+- **Client-Server Interface**: TCP/IP based communication with support for transactions and standard database operations
 
-The system uses a hybrid memory architecture:
-- **Data Storage**: All user data and WAL entries are stored in NVRAM for persistence
-- **Indexes**: B+ tree indexes are maintained in RAM for fast access
-- **Memory Management**: Custom memory allocators for both RAM and NVRAM
+## Performance Results
 
-### Write-Ahead Logging
+Our database significantly outperforms Redis across all YCSB workloads:
 
-The WAL implementation ensures data durability:
-- Each modification operation (insert/delete) is logged before execution
-- WAL entries are stored in NVRAM to survive system crashes
-- Each table has its own WAL structure for operation tracking
+| Workload | NVRAM-DB (ops/sec) | Redis (ops/sec) | Improvement |
+|----------|-------------------:|----------------:|------------:|
+| Load Phase | 11,494 | 9,009 | 1.28× |
+| Workload A (50% read/50% update) | 29,412 | 12,658 | 2.32× |
+| Workload B (95% read/5% update) | 32,258 | 11,628 | 2.77× |
+| Workload C (100% read) | 35,714 | 11,111 | 3.21× |
+| Workload D (95% read/5% insert) | 31,250 | 11,905 | 2.62× |
+
+### Latency Comparison (microseconds)
+
+| Operation | NVRAM-DB | Redis | Improvement |
+|-----------|--------:|------:|------------:|
+| Read Operations | 46.99 | 168.79 | 3.6× |
+| Update Operations | 79.93 | 110.89 | 1.4× |
+| Insert Operations | 218.67 | 428.09 | 2.0× |
+| Cleanup Overhead | 1.5-4.0 | 234-720 | 58-180× |
+
+## Technical Architecture
+
+The system consists of five main components:
+
+1. **Memory Management Subsystem**: Efficiently allocates and deallocates space within the NVRAM region
+2. **Indexing Structure**: Implements a B+ tree for fast data access while keeping only data in NVRAM
+3. **Write-Ahead Logging (WAL)**: Ensures transaction durability and atomicity using NVRAM-optimized techniques
+4. **Lock Manager**: Provides concurrency control for multi-threaded access with minimal contention
+5. **Database Interface**: Exposes operations to applications via a client-server architecture
+
+## Implementation Highlights
+
+- **NVRAM Simulation**: Uses Device DAX namespace configuration to simulate NVRAM characteristics on conventional hardware
+- **Persistence Instructions**: Leverages Intel CPU intrinsics for optimal cache line flushing and atomic updates
+- **Transaction Management**: Implements ACID-compliant transactions with optimistic concurrency control
+- **Recovery Mechanism**: Provides crash recovery through WAL replay
+- **Client-Server Protocol**: Simple text-based protocol for database operations
 
 ## Building and Running
 
-```bash
-# Compile the code
-make
+### Prerequisites
 
-# Run the database
-./nvram_db
-```
+- Linux-based OS (tested on Debian 12)
+- GCC compiler with C11 support
+- At least 16GB of system RAM (2GB reserved for NVRAM simulation)
 
-Note: The NVRAM path is configured in `free_space.h` and might need adjustment for your system.
+### Setting up NVRAM Simulation
 
-## Usage
+1. Configure GRUB to reserve RAM:
+   ```
+   sudo nano /etc/default/grub
+   # Add to GRUB_CMDLINE_LINUX_DEFAULT
+   GRUB_CMDLINE_LINUX_DEFAULT="quiet memmap=2G!12G"
+   sudo update-grub
+   sudo reboot
+   ```
 
-The database provides an interactive CLI with the following commands:
+2. Create a DAX namespace:
+   ```
+   sudo apt-get install ndctl
+   sudo ndctl create-namespace --mode=devdax --size=2G --region=region0
+   ```
 
-1. **Create Table**: Create a new database table
-2. **Open Table**: Open an existing table for operations
-3. **Insert Row**: Add a new row with key and data
-4. **Get Row**: Retrieve a row by key
-5. **Delete Row**: Remove a row by key
-6. **Iterate Table**: List all rows in the current table
-7. **Close Table**: Close the current table
-8. **Memory Stats**: Display memory usage statistics
-9. **Show WAL Data**: Display all logged operations
-10. **Exit**: Shutdown the database and exit
+### Compilation and Execution
 
-## Project Structure
+1. Compile the server and client:
+   ```
+   cd src_db_v3_2
+   make
+   ```
 
-```
-src/
-├── db_main.c         # Main application with CLI
-├── free_space.c      # NVRAM memory manager
-├── free_space.h      # NVRAM memory manager interface
-├── ram_bptree.c      # B+ tree implementation
-├── ram_bptree.h      # B+ tree interface
-├── ram_free_space.c  # RAM memory manager
-├── ram_free_space.h  # RAM memory manager interface
-├── wal.c             # Write-ahead logging implementation
-└── wal.h             # WAL interface
-```
+2. Run the server:
+   ```
+   sudo make server
+   ```
 
-## Dependencies
+3. In another terminal, run the client:
+   ```
+   make client
+   ```
 
-- A POSIX-compliant system (Linux/Unix)
-- GCC or compatible C compiler
-- Memory-mapped file for NVRAM simulation (2GB by default)
+## Future Work
 
-## Limitations (To Be Integrated)
+- Secondary index implementation
+- Distributed architecture for horizontal scaling
+- Hybrid storage tiering for larger datasets
+- SQL query interface
+- Advanced recovery mechanisms
+- Cache-line optimizations for NVRAM
 
-- No concurrency control (single-user system)
-- Simple key-value data model (integer keys only)
-- No complex queries or joins
-- B+ tree does not support node splitting (limited number of entries)
+## Documentation
+
+- [Project Report](https://drive.google.com/file/d/17bDsvFcicoeH_0PdnUEExI1pG0lu8iT5/view)
+- [Project Poster](https://drive.google.com/file/d/1qHQBTXKzCqPqGM3uWURBXLA2Rivw29Q8/view)
+
+## Acknowledgments
+
+This project was developed under the guidance of Dr. Gautum Barua at the Indian Institute of Information Technology Guwahati.
+
+## License
+
+[MIT License](LICENSE)
