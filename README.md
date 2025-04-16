@@ -6,6 +6,8 @@ A high-performance relational database system leveraging the unique properties o
 
 This project implements a hybrid database architecture that stores indexes in volatile RAM and data in persistent NVRAM, combining the performance of in-memory databases with the durability of persistent storage. Through careful optimization of data structures and algorithms for byte-addressability and persistence, the system demonstrates substantial performance gains in standard benchmarks.
 
+![Poster](images/overview.png)
+
 ## Key Features
 
 - **Hybrid Memory Architecture**: Maintains indexes in volatile RAM for speed while storing data persistently in NVRAM
@@ -14,6 +16,11 @@ This project implements a hybrid database architecture that stores indexes in vo
 - **Innovative Write-Ahead Logging**: Stores pointers rather than data blocks, uniquely possible with byte-addressability
 - **Multi-granular Lock Manager**: Supports both table and row-level locking with low contention
 - **Client-Server Interface**: TCP/IP based communication with support for transactions and standard database operations
+
+## Documentation
+
+- [Project Report](https://drive.google.com/file/d/17bDsvFcicoeH_0PdnUEExI1pG0lu8iT5/view)
+- [Project Poster](https://drive.google.com/file/d/1qHQBTXKzCqPqGM3uWURBXLA2Rivw29Q8/view)
 
 ## Performance Results
 
@@ -105,11 +112,6 @@ The system consists of five main components:
 - SQL query interface
 - Advanced recovery mechanisms
 - Cache-line optimizations for NVRAM
-
-## Documentation
-
-- [Project Report](https://drive.google.com/file/d/17bDsvFcicoeH_0PdnUEExI1pG0lu8iT5/view)
-- [Project Poster](https://drive.google.com/file/d/1qHQBTXKzCqPqGM3uWURBXLA2Rivw29Q8/view)
 
 ## Acknowledgments
 
